@@ -65,7 +65,7 @@ public class AudioEncoder {
         eosReceived = false;
         eosSentToAudioEncoder = false;
         stopReceived = false;
-        File f = FileUtils.createTempFileInRootAppStorage(c, "test_" + new Date().getTime() + ".m4a");
+        File f = FileUtils.createTempFileInCacheAppStorage(c, "test_" + new Date().getTime() + ".m4a");
         Toast.makeText(c, "Saving audio to: " + f.getAbsolutePath(), Toast.LENGTH_LONG).show();
 
         mAudioBufferInfo = new MediaCodec.BufferInfo();
@@ -78,9 +78,13 @@ public class AudioEncoder {
         audioFormat.setInteger(MediaFormat.KEY_BIT_RATE, 128000);
         audioFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16384);
 
-        mAudioEncoder = MediaCodec.createEncoderByType(AUDIO_MIME_TYPE);
-        mAudioEncoder.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
-        mAudioEncoder.start();
+        try {
+            mAudioEncoder = MediaCodec.createEncoderByType(AUDIO_MIME_TYPE);
+            mAudioEncoder.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            mAudioEncoder.start();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         try {
             mMuxer = new MediaMuxer(f.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);

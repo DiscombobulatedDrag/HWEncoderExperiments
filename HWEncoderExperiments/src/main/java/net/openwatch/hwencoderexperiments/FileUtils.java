@@ -104,4 +104,9 @@ public class FileUtils {
         return createTempFile(c, recordingDir, filename.split("\\.")[0], filename.split("\\.")[1]);
     }
 
+    public static File createTempFileInCacheAppStorage(Context c, String filename) {
+        File recodingDir = c.getCacheDir();
+        return createTempFile(c, recodingDir, filename.split("\\.")[0], filename.split("\\.")[1]);
+    }
+
 }

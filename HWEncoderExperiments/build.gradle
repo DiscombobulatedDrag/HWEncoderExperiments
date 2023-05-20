@@ -1,27 +1,25 @@
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:0.5.+'
-    }
-}
-apply plugin: 'android'
-
-repositories {
-    mavenCentral()
+plugins {
+    id 'com.android.application'
 }
 
 android {
-    compileSdkVersion 18
-    buildToolsVersion "18.0.1"
+    namespace 'net.openwatch.hwencoderexperiments'
+    compileSdk 33
 
     defaultConfig {
-        minSdkVersion 18
-        targetSdkVersion 18
+        applicationId "net.openwatch.hwencoderexperiments"
+        minSdk 29
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 }
 
 dependencies {
-    compile 'com.android.support:appcompat-v7:18.0.0'
+
 }
