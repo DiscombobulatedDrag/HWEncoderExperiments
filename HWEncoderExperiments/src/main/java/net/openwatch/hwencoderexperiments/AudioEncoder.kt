@@ -1,140 +1,135 @@
-package net.openwatch.hwencoderexperiments;
+package net.openwatch.hwencoderexperiments
 
-import android.content.Context;
-import android.media.MediaCodec;
-import android.media.MediaCodecInfo;
-import android.media.MediaFormat;
-import android.media.MediaMuxer;
-import android.util.Log;
-import android.widget.Toast;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Date;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import android.content.Context
+import android.media.MediaCodec
+import android.media.MediaCodecInfo
+import android.media.MediaFormat
+import android.media.MediaMuxer
+import android.util.Log
+import android.widget.Toast
+import java.io.IOException
+import java.util.Date
+import java.util.concurrent.Executors
 
 /**
  * Created by davidbrodsky on 9/12/13.
  * Enormous thanks to Andrew McFadden for his MediaCodec examples!
  * Adapted from http://bigflake.com/mediacodec/CameraToMpegTest.java.txt
  */
-public class AudioEncoder {
-    private static final String TAG = "AudioEncoder";
-    private static final String AUDIO_MIME_TYPE = "audio/mp4a-latm";
-    private static final boolean VERBOSE = false;
-    // Muxer state
-    private static final int TOTAL_NUM_TRACKS = 1;
-    // Audio state
-    private static long audioBytesReceived = 0;
-    private static int numTracksAdded = 0;
-    boolean eosReceived = false;
-    boolean eosSentToAudioEncoder = false;
-    boolean stopReceived = false;
-    long audioStartTime = 0;
-    int frameCount = 0;
-    int totalInputAudioFrameCount = 0; // testing
-    int totalOutputAudioFrameCount = 0;
-    Context c;
-    int encodingServiceQueueLength = 0;
-    private MediaFormat audioFormat;
-    private MediaCodec mAudioEncoder;
-    private final TrackIndex mAudioTrackIndex = new TrackIndex();
-    private MediaMuxer mMuxer;
-    private boolean mMuxerStarted;
-    private MediaCodec.BufferInfo mAudioBufferInfo;
-    private final ExecutorService encodingService = Executors.newSingleThreadExecutor(); // re-use encodingService
+class AudioEncoder(var c: Context) {
+    var eosReceived = false
+    var eosSentToAudioEncoder = false
+    var stopReceived = false
+    var audioStartTime: Long = 0
+    var frameCount = 0
+    var totalInputAudioFrameCount = 0 // testing
+    var totalOutputAudioFrameCount = 0
+    var encodingServiceQueueLength = 0
+    private var audioFormat: MediaFormat? = null
+    private var mAudioEncoder: MediaCodec? = null
+    private val mAudioTrackIndex = TrackIndex()
+    private var mMuxer: MediaMuxer? = null
+    private var mMuxerStarted = false
+    private var mAudioBufferInfo: MediaCodec.BufferInfo? = null
+    private val encodingService = Executors.newSingleThreadExecutor() // re-use encodingService
+    var audioSoftwarePoller: AudioSoftwarePoller? = null
 
-    AudioSoftwarePoller audioSoftwarePoller;
-
-    public AudioEncoder(Context c) {
-        this.c = c;
-        prepare();
+    init {
+        prepare()
     }
 
-    public void setAudioSoftwarePoller(AudioSoftwarePoller audioSoftwarePoller) {
-        this.audioSoftwarePoller = audioSoftwarePoller;
-    }
-
-
-    private void prepare() {
-        audioBytesReceived = 0;
-        numTracksAdded = 0;
-        frameCount = 0;
-        eosReceived = false;
-        eosSentToAudioEncoder = false;
-        stopReceived = false;
-        File f = FileUtils.createTempFileInCacheAppStorage(c, "test_" + new Date().getTime() + ".m4a");
-        Toast.makeText(c, "Saving audio to: " + f.getAbsolutePath(), Toast.LENGTH_LONG).show();
-
-        mAudioBufferInfo = new MediaCodec.BufferInfo();
-
-        audioFormat = new MediaFormat();
-        audioFormat.setString(MediaFormat.KEY_MIME, AUDIO_MIME_TYPE);
-        audioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
-        audioFormat.setInteger(MediaFormat.KEY_SAMPLE_RATE, 16000);
-        audioFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
-        audioFormat.setInteger(MediaFormat.KEY_BIT_RATE, 64000);
-        audioFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16384);
-
+    private fun prepare() {
+        audioBytesReceived = 0
+        numTracksAdded = 0
+        frameCount = 0
+        eosReceived = false
+        eosSentToAudioEncoder = false
+        stopReceived = false
+        val f = FileUtils.createTempFileInCacheAppStorage(
+            c, "test_" + Date().time + ".m4a"
+        )
+        Toast.makeText(c, "Saving audio to: " + f.absolutePath, Toast.LENGTH_LONG).show()
+        mAudioBufferInfo = MediaCodec.BufferInfo()
+        audioFormat = MediaFormat()
+        audioFormat!!.setString(MediaFormat.KEY_MIME, AUDIO_MIME_TYPE)
+        audioFormat!!.setInteger(
+            MediaFormat.KEY_AAC_PROFILE,
+            MediaCodecInfo.CodecProfileLevel.AACObjectLC
+        )
+        audioFormat!!.setInteger(MediaFormat.KEY_SAMPLE_RATE, 16000)
+        audioFormat!!.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1)
+        audioFormat!!.setInteger(MediaFormat.KEY_BIT_RATE, 64000)
+        audioFormat!!.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16384)
         try {
-            mAudioEncoder = MediaCodec.createEncoderByType(AUDIO_MIME_TYPE);
-            mAudioEncoder.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
-            mAudioEncoder.start();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            mAudioEncoder = MediaCodec.createEncoderByType(AUDIO_MIME_TYPE)
+            mAudioEncoder!!.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            mAudioEncoder!!.start()
+        } catch (e: IOException) {
+            throw RuntimeException(e)
         }
-
-        try {
-            mMuxer = new MediaMuxer(f.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-        } catch (IOException ioe) {
-            throw new RuntimeException("MediaMuxer creation failed", ioe);
+        mMuxer = try {
+            MediaMuxer(f.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        } catch (ioe: IOException) {
+            throw RuntimeException("MediaMuxer creation failed", ioe)
         }
     }
 
-    public void stop() {
-        if (!encodingService.isShutdown())
-            encodingService.submit(new EncoderTask(this, EncoderTaskType.FINALIZE_ENCODER));
+    fun stop() {
+        if (!encodingService.isShutdown) encodingService.submit(
+            EncoderTask(
+                this,
+                EncoderTaskType.FINALIZE_ENCODER
+            )
+        )
     }
 
     /**
      * Called from encodingService
      */
-    public void _stop() {
-        stopReceived = true;
-        eosReceived = true;
-        logStatistics();
+    fun _stop() {
+        stopReceived = true
+        eosReceived = true
+        logStatistics()
     }
 
-    public void closeEncoderAndMuxer(MediaCodec encoder, MediaCodec.BufferInfo bufferInfo, TrackIndex trackIndex) {
-        drainEncoder(encoder, bufferInfo, trackIndex, true);
+    fun closeEncoderAndMuxer(
+        encoder: MediaCodec?,
+        bufferInfo: MediaCodec.BufferInfo?,
+        trackIndex: TrackIndex
+    ) {
+        var encoder = encoder
+        drainEncoder(encoder, bufferInfo, trackIndex, true)
         try {
-            encoder.stop();
-            encoder.release();
-            encoder = null;
-            closeMuxer();
-        } catch (Exception e) {
-            e.printStackTrace();
+            encoder!!.stop()
+            encoder.release()
+            encoder = null
+            closeMuxer()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
-    public void closeEncoder(MediaCodec encoder, MediaCodec.BufferInfo bufferInfo, TrackIndex trackIndex) {
-        drainEncoder(encoder, bufferInfo, trackIndex, true);
+    fun closeEncoder(
+        encoder: MediaCodec?,
+        bufferInfo: MediaCodec.BufferInfo?,
+        trackIndex: TrackIndex
+    ) {
+        var encoder = encoder
+        drainEncoder(encoder, bufferInfo, trackIndex, true)
         try {
-            encoder.stop();
-            encoder.release();
-            encoder = null;
-        } catch (Exception e) {
-            e.printStackTrace();
+            encoder!!.stop()
+            encoder.release()
+            encoder = null
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
-    public void closeMuxer() {
-        mMuxer.stop();
-        mMuxer.release();
-        mMuxer = null;
-        mMuxerStarted = false;
+    fun closeMuxer() {
+        mMuxer!!.stop()
+        mMuxer!!.release()
+        mMuxer = null
+        mMuxerStarted = false
     }
 
     /**
@@ -142,13 +137,12 @@ public class AudioEncoder {
      *
      * @param input
      */
-    public void offerAudioEncoder(byte[] input, long presentationTimeStampNs) {
-        if (!encodingService.isShutdown()) {
+    fun offerAudioEncoder(input: ByteArray?, presentationTimeStampNs: Long) {
+        if (!encodingService.isShutdown) {
             //long thisFrameTime = (presentationTimeNs == 0) ? System.nanoTime() : presentationTimeNs;
-            encodingService.submit(new EncoderTask(this, input, presentationTimeStampNs));
-            encodingServiceQueueLength++;
+            encodingService.submit(EncoderTask(this, input, presentationTimeStampNs))
+            encodingServiceQueueLength++
         }
-
     }
 
     /**
@@ -157,248 +151,277 @@ public class AudioEncoder {
      * @param input
      * @param presentationTimeNs
      */
-    private void _offerAudioEncoder(byte[] input, long presentationTimeNs) {
-        if (audioBytesReceived == 0) {
-            audioStartTime = presentationTimeNs;
+    private fun _offerAudioEncoder(input: ByteArray?, presentationTimeNs: Long) {
+        if (audioBytesReceived == 0L) {
+            audioStartTime = presentationTimeNs
         }
-        totalInputAudioFrameCount++;
-        audioBytesReceived += input.length;
+        totalInputAudioFrameCount++
+        audioBytesReceived += input!!.size.toLong()
         if (eosSentToAudioEncoder && stopReceived || input == null) {
-            logStatistics();
+            logStatistics()
             if (eosReceived) {
-                Log.i(TAG, "EOS received in offerAudioEncoder");
-                closeEncoderAndMuxer(mAudioEncoder, mAudioBufferInfo, mAudioTrackIndex);
-                eosSentToAudioEncoder = true;
+                Log.i(TAG, "EOS received in offerAudioEncoder")
+                closeEncoderAndMuxer(mAudioEncoder, mAudioBufferInfo, mAudioTrackIndex)
+                eosSentToAudioEncoder = true
                 if (!stopReceived) {
                     // swap encoder
-                    prepare();
+                    prepare()
                 } else {
-                    Log.i(TAG, "Stopping Encoding Service");
-                    encodingService.shutdown();
+                    Log.i(TAG, "Stopping Encoding Service")
+                    encodingService.shutdown()
                 }
             }
-            return;
+            return
         }
         // transfer previously encoded data to muxer
-        drainEncoder(mAudioEncoder, mAudioBufferInfo, mAudioTrackIndex, false);
+        drainEncoder(mAudioEncoder, mAudioBufferInfo, mAudioTrackIndex, false)
         // send current frame data to encoder
         try {
-            ByteBuffer[] inputBuffers = mAudioEncoder.getInputBuffers();
-            int inputBufferIndex = mAudioEncoder.dequeueInputBuffer(-1);
+            val inputBuffers = mAudioEncoder!!.inputBuffers
+            val inputBufferIndex = mAudioEncoder!!.dequeueInputBuffer(-1)
             if (inputBufferIndex >= 0) {
-                ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
-                inputBuffer.clear();
-                inputBuffer.put(input);
+                val inputBuffer = inputBuffers[inputBufferIndex]
+                inputBuffer.clear()
+                inputBuffer.put(input)
+
                 if (audioSoftwarePoller != null) {
-                    audioSoftwarePoller.recycleInputBuffer(input);
+                    audioSoftwarePoller!!.recycleInputBuffer(input)
                 }
-                long presentationTimeUs = (presentationTimeNs - audioStartTime) / 1000;
+                val presentationTimeUs = (presentationTimeNs - audioStartTime) / 1000
                 if (eosReceived) {
-                    Log.i(TAG, "EOS received in offerEncoder");
-                    mAudioEncoder.queueInputBuffer(inputBufferIndex, 0, input.length, presentationTimeUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                    closeEncoderAndMuxer(mAudioEncoder, mAudioBufferInfo, mAudioTrackIndex); // always called after video, so safe to close muxer
-                    eosSentToAudioEncoder = true;
+                    Log.i(TAG, "EOS received in offerEncoder")
+                    mAudioEncoder!!.queueInputBuffer(
+                        inputBufferIndex,
+                        0,
+                        input.size,
+                        presentationTimeUs,
+                        MediaCodec.BUFFER_FLAG_END_OF_STREAM
+                    )
+                    closeEncoderAndMuxer(
+                        mAudioEncoder,
+                        mAudioBufferInfo,
+                        mAudioTrackIndex
+                    ) // always called after video, so safe to close muxer
+                    eosSentToAudioEncoder = true
                     if (stopReceived) {
-                        Log.i(TAG, "Stopping Encoding Service");
-                        encodingService.shutdown();
+                        Log.i(TAG, "Stopping Encoding Service")
+                        encodingService.shutdown()
                     }
                 } else {
-                    mAudioEncoder.queueInputBuffer(inputBufferIndex, 0, input.length, presentationTimeUs, 0);
+                    mAudioEncoder!!.queueInputBuffer(
+                        inputBufferIndex,
+                        0,
+                        input.size,
+                        presentationTimeUs,
+                        0
+                    )
                 }
             }
-        } catch (Throwable t) {
-            Log.e(TAG, "_offerAudioEncoder exception");
-            t.printStackTrace();
+        } catch (t: Throwable) {
+            Log.e(TAG, "_offerAudioEncoder exception")
+            t.printStackTrace()
         }
     }
 
     /**
      * Extracts all pending data from the encoder and forwards it to the muxer.
-     * <p/>
+     *
+     *
      * If endOfStream is not set, this returns when there is no more data to drain.  If it
      * is set, we send EOS to the encoder, and then iterate until we see EOS on the output.
      * Calling this with endOfStream set should be done once, right before stopping the muxer.
-     * <p/>
+     *
+     *
      * We're just using the muxer to get a .mp4 file (instead of a raw H.264 stream).  We're
      * not recording audio.
      */
-    private void drainEncoder(MediaCodec encoder, MediaCodec.BufferInfo bufferInfo, TrackIndex trackIndex, boolean endOfStream) {
-        final int TIMEOUT_USEC = 100;
-        if (VERBOSE) Log.d(TAG, "drainEncoder(" + endOfStream + ")");
-        ByteBuffer[] encoderOutputBuffers = encoder.getOutputBuffers();
+    private fun drainEncoder(
+        encoder: MediaCodec?,
+        bufferInfo: MediaCodec.BufferInfo?,
+        trackIndex: TrackIndex,
+        endOfStream: Boolean
+    ) {
+        val TIMEOUT_USEC = 100
+        if (VERBOSE) Log.d(TAG, "drainEncoder($endOfStream)")
+        var encoderOutputBuffers = encoder!!.outputBuffers
         while (true) {
-            int encoderStatus = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
+            val encoderStatus = encoder.dequeueOutputBuffer(bufferInfo!!, TIMEOUT_USEC.toLong())
             if (encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 // no output available yet
                 if (!endOfStream) {
-                    break;      // out of while
+                    break // out of while
                 } else {
-                    if (VERBOSE) Log.d(TAG, "no output available, spinning to await EOS");
+                    if (VERBOSE) Log.d(TAG, "no output available, spinning to await EOS")
                 }
             } else if (encoderStatus == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
                 // not expected for an encoder
-                encoderOutputBuffers = encoder.getOutputBuffers();
+                encoderOutputBuffers = encoder.outputBuffers
             } else if (encoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                 // should happen before receiving buffers, and should only happen once
-
                 if (mMuxerStarted) {
-                    throw new RuntimeException("format changed after muxer start");
+                    throw RuntimeException("format changed after muxer start")
                 }
-                MediaFormat newFormat = encoder.getOutputFormat();
+                val newFormat = encoder.outputFormat
 
                 // now that we have the Magic Goodies, start the muxer
-                trackIndex.index = mMuxer.addTrack(newFormat);
-                numTracksAdded++;
-                Log.d(TAG, "encoder output format changed: " + newFormat + ". Added track index: " + trackIndex.index);
+                trackIndex.index = mMuxer!!.addTrack(newFormat)
+                numTracksAdded++
+                Log.d(
+                    TAG,
+                    "encoder output format changed: " + newFormat + ". Added track index: " + trackIndex.index
+                )
                 if (numTracksAdded == TOTAL_NUM_TRACKS) {
-                    mMuxer.start();
-                    mMuxerStarted = true;
-                    Log.i(TAG, "All tracks added. Muxer started");
+                    mMuxer!!.start()
+                    mMuxerStarted = true
+                    Log.i(TAG, "All tracks added. Muxer started")
                 }
-
             } else if (encoderStatus < 0) {
-                Log.w(TAG, "unexpected result from encoder.dequeueOutputBuffer: " +
-                        encoderStatus);
+                Log.w(
+                    TAG, "unexpected result from encoder.dequeueOutputBuffer: " +
+                            encoderStatus
+                )
                 // let's ignore it
             } else {
-                ByteBuffer encodedData = encoderOutputBuffers[encoderStatus];
-                if (encodedData == null) {
-                    throw new RuntimeException("encoderOutputBuffer " + encoderStatus +
-                            " was null");
-                }
-
-
-                if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                val encodedData = encoderOutputBuffers[encoderStatus]
+                    ?: throw RuntimeException(
+                        "encoderOutputBuffer " + encoderStatus +
+                                " was null"
+                    )
+                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
                     // The codec config data was pulled out and fed to the muxer when we got
                     // the INFO_OUTPUT_FORMAT_CHANGED status.  Ignore it.
-                    if (VERBOSE) Log.d(TAG, "ignoring BUFFER_FLAG_CODEC_CONFIG");
-                    bufferInfo.size = 0;
+                    if (VERBOSE) Log.d(TAG, "ignoring BUFFER_FLAG_CODEC_CONFIG")
+                    bufferInfo.size = 0
                 }
-
-
                 if (bufferInfo.size != 0) {
                     if (!mMuxerStarted) {
-                        throw new RuntimeException("muxer hasn't started");
+                        throw RuntimeException("muxer hasn't started")
                     }
 
                     // adjust the ByteBuffer values to match BufferInfo (not needed?)
-                    encodedData.position(bufferInfo.offset);
-                    encodedData.limit(bufferInfo.offset + bufferInfo.size);
-                    mMuxer.writeSampleData(trackIndex.index, encodedData, bufferInfo);
+                    encodedData.position(bufferInfo.offset)
+                    encodedData.limit(bufferInfo.offset + bufferInfo.size)
+                    mMuxer!!.writeSampleData(trackIndex.index, encodedData, bufferInfo)
                 }
-
-                encoder.releaseOutputBuffer(encoderStatus, false);
-
-                if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                encoder.releaseOutputBuffer(encoderStatus, false)
+                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
                     if (!endOfStream) {
-                        Log.w(TAG, "reached end of stream unexpectedly");
+                        Log.w(TAG, "reached end of stream unexpectedly")
                     } else {
-                        if (VERBOSE) Log.d(TAG, "end of stream reached");
+                        if (VERBOSE) Log.d(TAG, "end of stream reached")
                     }
-                    break;      // out of while
+                    break // out of while
                 }
             }
         }
-        long endTime = System.nanoTime();
+        val endTime = System.nanoTime()
     }
 
-    private void logStatistics() {
-        Log.i(TAG + "-Stats", "audio frames input: " + totalInputAudioFrameCount + " output: " + totalOutputAudioFrameCount);
+    private fun logStatistics() {
+        Log.i(
+            TAG + "-Stats",
+            "audio frames input: $totalInputAudioFrameCount output: $totalOutputAudioFrameCount"
+        )
     }
 
-    enum EncoderTaskType {
-        ENCODE_FRAME, /*SHIFT_ENCODER,*/ FINALIZE_ENCODER
+    internal enum class EncoderTaskType {
+        ENCODE_FRAME,  /*SHIFT_ENCODER,*/
+        FINALIZE_ENCODER
     }
 
     // Can't pass an int by reference in Java...
-    class TrackIndex {
-        int index = 0;
+    inner class TrackIndex {
+        var index = 0
     }
 
-    private class EncoderTask implements Runnable {
-        private static final String TAG = "encoderTask";
-        boolean is_initialized = false;
-        long presentationTimeNs;
-        private AudioEncoder encoder;
-        private EncoderTaskType type;
-        private byte[] audio_data;
+    private inner class EncoderTask : Runnable {
 
-        public EncoderTask(AudioEncoder encoder, EncoderTaskType type) {
-            setEncoder(encoder);
-            this.type = type;
+        private  val TAG = "encoderTask"
+        var is_initialized = false
+        var presentationTimeNs: Long = 0
+        private var encoder: AudioEncoder? = null
+        private var type: EncoderTaskType? = null
+        private var audio_data: ByteArray? = null
+
+        constructor(encoder: AudioEncoder, type: EncoderTaskType) {
+            setEncoder(encoder)
+            this.type = type
             /*
                 case SHIFT_ENCODER:
                     setShiftEncoderParams();
                     break;
-                */
-            if (type == EncoderTaskType.FINALIZE_ENCODER) {
-                setFinalizeEncoderParams();
+                */if (type == EncoderTaskType.FINALIZE_ENCODER) {
+                setFinalizeEncoderParams()
             }
         }
 
-        public EncoderTask(AudioEncoder encoder, byte[] audio_data, long pts) {
-            setEncoder(encoder);
-            setEncodeFrameParams(audio_data, pts);
+        constructor(encoder: AudioEncoder, audio_data: ByteArray?, pts: Long) {
+            setEncoder(encoder)
+            setEncodeFrameParams(audio_data, pts)
         }
 
-        public EncoderTask(AudioEncoder encoder) {
-            setEncoder(encoder);
-            setFinalizeEncoderParams();
+        constructor(encoder: AudioEncoder) {
+            setEncoder(encoder)
+            setFinalizeEncoderParams()
         }
 
-        private void setEncoder(AudioEncoder encoder) {
-            this.encoder = encoder;
+        private fun setEncoder(encoder: AudioEncoder) {
+            this.encoder = encoder
         }
 
-        private void setFinalizeEncoderParams() {
-            is_initialized = true;
+        private fun setFinalizeEncoderParams() {
+            is_initialized = true
         }
 
-        private void setEncodeFrameParams(byte[] audio_data, long pts) {
-            this.audio_data = audio_data;
-            this.presentationTimeNs = pts;
-
-            is_initialized = true;
-            this.type = EncoderTaskType.ENCODE_FRAME;
+        private fun setEncodeFrameParams(audio_data: ByteArray?, pts: Long) {
+            this.audio_data = audio_data
+            presentationTimeNs = pts
+            is_initialized = true
+            type = EncoderTaskType.ENCODE_FRAME
         }
 
-        private void encodeFrame() {
+        private fun encodeFrame() {
             if (encoder != null && audio_data != null) {
-                encoder._offerAudioEncoder(audio_data, presentationTimeNs);
-                audio_data = null;
+                encoder!!._offerAudioEncoder(audio_data, presentationTimeNs)
+                audio_data = null
             }
         }
 
-        private void finalizeEncoder() {
-            encoder._stop();
+        private fun finalizeEncoder() {
+            encoder!!._stop()
         }
 
-        @Override
-        public void run() {
+        override fun run() {
             if (is_initialized) {
-                switch (type) {
-                    case ENCODE_FRAME:
-                        encodeFrame();
-                        break;
-                    /*
-                    case SHIFT_ENCODER:
-                        shiftEncoder();
-                        break;
-                    */
-                    case FINALIZE_ENCODER:
-                        finalizeEncoder();
-                        break;
-
+                when (type) {
+                    EncoderTaskType.ENCODE_FRAME -> encodeFrame()
+                    EncoderTaskType.FINALIZE_ENCODER -> finalizeEncoder()
+                    else -> {}
                 }
                 // prevent multiple execution of same task
-                is_initialized = false;
-                encodingServiceQueueLength -= 1;
+                is_initialized = false
+                encodingServiceQueueLength -= 1
                 //Log.i(TAG, "EncodingService Queue length: " + encodingServiceQueueLength);
             } else {
-                Log.e(TAG, "run() called but EncoderTask not initialized");
+                Log.e(Companion.TAG, "run() called but EncoderTask not initialized")
             }
-
         }
 
+//        companion object {
+//            private const val TAG = "encoderTask"
+//        }
+    }
+
+    companion object {
+        private const val TAG = "AudioEncoder"
+        private const val AUDIO_MIME_TYPE = "audio/mp4a-latm"
+        private const val VERBOSE = false
+
+        // Muxer state
+        private const val TOTAL_NUM_TRACKS = 1
+
+        // Audio state
+        private var audioBytesReceived: Long = 0
+        private var numTracksAdded = 0
     }
 }
