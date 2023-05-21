@@ -15,11 +15,11 @@ public class HWRecorderActivity extends Activity {
 
     Button recordButton;
 
-    protected void onCreate (Bundle savedInstanceState){
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getActionBar().setTitle("");
         setContentView(R.layout.activity_hwrecorder);
-        recordButton = (Button) findViewById(R.id.recordButton);
+        recordButton = findViewById(R.id.recordButton);
 
         // test MediaCodec capabilities
         /*
@@ -40,12 +40,12 @@ public class HWRecorderActivity extends Activity {
     }
 
 
-    public void onRecordButtonClick(View v){
+    public void onRecordButtonClick(View v) {
         recording = !recording;
 
-        Log.i(TAG, "Record button hit. Start: " + String.valueOf(recording));
+        Log.i(TAG, "Record button hit. Start: " + recording);
 
-        if(recording){
+        if (recording) {
             recordButton.setText(R.string.stop_recording);
 
             mEncoder = new AudioEncoder(getApplicationContext());
@@ -53,9 +53,9 @@ public class HWRecorderActivity extends Activity {
             audioPoller.setAudioEncoder(mEncoder);
             mEncoder.setAudioSoftwarePoller(audioPoller);
             audioPoller.startPolling();
-        }else{
+        } else {
             recordButton.setText(R.string.start_recording);
-            if(mEncoder != null){
+            if (mEncoder != null) {
                 audioPoller.stopPolling();
                 mEncoder.stop();
             }
@@ -64,12 +64,13 @@ public class HWRecorderActivity extends Activity {
     }
 
     static byte[] audioData;
-    private static byte[] getSimulatedAudioInput(){
+
+    private static byte[] getSimulatedAudioInput() {
         int magnitude = 10;
-        if(audioData == null){
+        if (audioData == null) {
             //audioData = new byte[1024];
             audioData = new byte[1470]; // this is roughly equal to the audio expected between 30 fps frames
-            for(int x=0; x<audioData.length - 1; x++){
+            for (int x = 0; x < audioData.length - 1; x++) {
                 audioData[x] = (byte) (magnitude * Math.sin(x));
             }
             Log.i(TAG, "generated simulated audio data");

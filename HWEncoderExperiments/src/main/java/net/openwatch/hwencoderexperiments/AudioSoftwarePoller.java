@@ -1,5 +1,6 @@
 package net.openwatch.hwencoderexperiments;
 
+import android.annotation.SuppressLint;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -21,7 +22,7 @@ import java.util.concurrent.ArrayBlockingQueue;
  */
 public class AudioSoftwarePoller {
     public static final String TAG = "AudioSoftwarePoller";
-    public static final int SAMPLE_RATE = 44100;
+    public static final int SAMPLE_RATE = 16000;
     public static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
     public static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
     public static final int FRAMES_PER_BUFFER = 24; // 1 sec @ 1024 samples/frame (aac)
@@ -54,16 +55,17 @@ public class AudioSoftwarePoller {
     /**
      * Return the number of microseconds represented by each audio frame
      * calculated with the sampling rate and samples per frame
+     *
      * @return
      */
-    public long getMicroSecondsPerFrame(){
-        if(US_PER_FRAME == 0){
-            US_PER_FRAME = (SAMPLE_RATE / recorderTask.samples_per_frame) * 1000000;
+    public long getMicroSecondsPerFrame() {
+        if (US_PER_FRAME == 0) {
+            US_PER_FRAME = (SAMPLE_RATE / recorderTask.samples_per_frame) * 1000000L;
         }
         return US_PER_FRAME;
     }
 
-    public void recycleInputBuffer(byte[] buffer){
+    public void recycleInputBuffer(byte[] buffer) {
         recorderTask.data_buffer.offer(buffer);
     }
 
@@ -94,6 +96,7 @@ public class AudioSoftwarePoller {
 
         int read_result = 0;
 
+        @SuppressLint("MissingPermission")
         public void run() {
             int min_buffer_size = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
 
@@ -105,7 +108,7 @@ public class AudioSoftwarePoller {
                 buffer_size = ((min_buffer_size / samples_per_frame) + 1) * samples_per_frame * 2;
 
             //data_buffer = new byte[samples_per_frame]; // filled directly by hardware
-            for(int x=0; x < 25; x++)
+            for (int x = 0; x < 25; x++)
                 data_buffer.add(new byte[samples_per_frame]);
 
             AudioRecord audio_recorder;
@@ -125,20 +128,20 @@ public class AudioSoftwarePoller {
                 //read_result = audio_recorder.read(data_buffer, buffer_write_index, samples_per_frame);
                 audioPresentationTimeNs = System.nanoTime();
                 byte[] this_buffer;
-                if(data_buffer.isEmpty()){
+                if (data_buffer.isEmpty()) {
                     this_buffer = new byte[samples_per_frame];
                     //Log.i(TAG, "Audio buffer empty. added new buffer");
-                }else{
+                } else {
                     this_buffer = data_buffer.poll();
                 }
                 read_result = audio_recorder.read(this_buffer, 0, samples_per_frame);
                 if (VERBOSE)
-                    Log.i("AudioSoftwarePoller-FillBuffer", String.valueOf(buffer_write_index) + " - " + String.valueOf(buffer_write_index + samples_per_frame - 1));
-                if(read_result == AudioRecord.ERROR_BAD_VALUE || read_result == AudioRecord.ERROR_INVALID_OPERATION)
+                    Log.i("AudioSoftwarePoller-FillBuffer", buffer_write_index + " - " + (buffer_write_index + samples_per_frame - 1));
+                if (read_result == AudioRecord.ERROR_BAD_VALUE || read_result == AudioRecord.ERROR_INVALID_OPERATION)
                     Log.e("AudioSoftwarePoller", "Read error");
                 //buffer_write_index = (buffer_write_index + samples_per_frame) % buffer_size;
                 total_frames_written++;
-                if(audioEncoder != null){
+                if (audioEncoder != null) {
                     audioEncoder.offerAudioEncoder(this_buffer, audioPresentationTimeNs);
                 }
             }

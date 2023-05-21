@@ -40,11 +40,11 @@ public class AudioEncoder {
     int encodingServiceQueueLength = 0;
     private MediaFormat audioFormat;
     private MediaCodec mAudioEncoder;
-    private TrackIndex mAudioTrackIndex = new TrackIndex();
+    private final TrackIndex mAudioTrackIndex = new TrackIndex();
     private MediaMuxer mMuxer;
     private boolean mMuxerStarted;
     private MediaCodec.BufferInfo mAudioBufferInfo;
-    private ExecutorService encodingService = Executors.newSingleThreadExecutor(); // re-use encodingService
+    private final ExecutorService encodingService = Executors.newSingleThreadExecutor(); // re-use encodingService
 
     AudioSoftwarePoller audioSoftwarePoller;
 
@@ -53,7 +53,7 @@ public class AudioEncoder {
         prepare();
     }
 
-    public void setAudioSoftwarePoller(AudioSoftwarePoller audioSoftwarePoller){
+    public void setAudioSoftwarePoller(AudioSoftwarePoller audioSoftwarePoller) {
         this.audioSoftwarePoller = audioSoftwarePoller;
     }
 
@@ -73,9 +73,9 @@ public class AudioEncoder {
         audioFormat = new MediaFormat();
         audioFormat.setString(MediaFormat.KEY_MIME, AUDIO_MIME_TYPE);
         audioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
-        audioFormat.setInteger(MediaFormat.KEY_SAMPLE_RATE, 44100);
+        audioFormat.setInteger(MediaFormat.KEY_SAMPLE_RATE, 16000);
         audioFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
-        audioFormat.setInteger(MediaFormat.KEY_BIT_RATE, 128000);
+        audioFormat.setInteger(MediaFormat.KEY_BIT_RATE, 64000);
         audioFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16384);
 
         try {
@@ -189,7 +189,7 @@ public class AudioEncoder {
                 ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
                 inputBuffer.clear();
                 inputBuffer.put(input);
-                if(audioSoftwarePoller != null){
+                if (audioSoftwarePoller != null) {
                     audioSoftwarePoller.recycleInputBuffer(input);
                 }
                 long presentationTimeUs = (presentationTimeNs - audioStartTime) / 1000;
@@ -307,7 +307,7 @@ public class AudioEncoder {
     }
 
     enum EncoderTaskType {
-        ENCODE_FRAME, /*SHIFT_ENCODER,*/ FINALIZE_ENCODER;
+        ENCODE_FRAME, /*SHIFT_ENCODER,*/ FINALIZE_ENCODER
     }
 
     // Can't pass an int by reference in Java...
@@ -326,15 +326,13 @@ public class AudioEncoder {
         public EncoderTask(AudioEncoder encoder, EncoderTaskType type) {
             setEncoder(encoder);
             this.type = type;
-            switch (type) {
-                /*
+            /*
                 case SHIFT_ENCODER:
                     setShiftEncoderParams();
                     break;
                 */
-                case FINALIZE_ENCODER:
-                    setFinalizeEncoderParams();
-                    break;
+            if (type == EncoderTaskType.FINALIZE_ENCODER) {
+                setFinalizeEncoderParams();
             }
         }
 
@@ -365,7 +363,7 @@ public class AudioEncoder {
         }
 
         private void encodeFrame() {
-        if (encoder != null && audio_data != null) {
+            if (encoder != null && audio_data != null) {
                 encoder._offerAudioEncoder(audio_data, presentationTimeNs);
                 audio_data = null;
             }
